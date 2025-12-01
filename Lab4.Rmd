@@ -1,0 +1,499 @@
+---
+title: 'P&S-2025: Lab assignment 4'
+author: "Hombosh Oleh, Matseliukh Maksym, Leshchuk Roman"
+output:
+  html_document:
+    df_print: paged
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+# Setup
+
+```{r}
+team_id <- 39
+set.seed(team_id)
+
+library(ggplot2)
+```
+
+# Work Breakdown Structure
+
+| Team Member  | Tasks Estimated Effort |
+|--------------|------------------------|
+| Hombosh Oleh | Problem 1, Problem 2   |
+| Matseliukh Maksym     | Problem 3              |
+| Leshchuk Roman     | Problem 4              |
+
+
+# Data Generation
+
+First, we generate the samples $X$ and $Y$ based on the team ID
+($n = `r team_id`$). The formula for the sequence is
+$a_k = \{ k \ln (k (2n + \pi)) \}$, where $\{x\}$ denotes the fractional
+part of $x$.
+
+```{r}
+n <- team_id
+
+get_ak <- function(k, n) {
+  val <- k * log((k^2) * n + pi)
+  return(val - floor(val))
+}
+
+k_x <- 1:100
+k_y <- 1:50
+
+a_x <- sapply(k_x, get_ak, n = n)
+a_y <- sapply(k_y, function(l) get_ak(l + 100, n = n))
+
+X <- qnorm(a_x)
+Y <- qnorm(a_y)
+
+df_X <- data.frame(Value = X, Group = "X")
+df_Y <- data.frame(Value = Y, Group = "Y")
+df_combined <- rbind(df_X, df_Y)
+
+ggplot(df_combined, aes(x = Value, fill = Group)) +
+  geom_density(alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Density of Generated Samples X and Y")
+
+
+cat("Sample X (n=100): Mean =", mean(X), ", Variance =", var(X), "\n")
+cat("Sample Y (n=50):  Mean =", mean(Y), ", Variance =", var(Y), "\n")
+```
+
+# Problem 1.
+
+## Theoretical Background: Two-Sample Z-Test for Means
+
+In this problem, we test whether the population means of two independent
+samples, $X$ and $Y$, are equal. We assume that the population variances
+are known and equal to 1.
+
+**1. Hypotheses:** The null hypothesis ($H_0$) assumes no difference
+between the means, while the alternative hypothesis ($H_1$) claims a
+significant difference exists. $$
+\begin{aligned}
+H_0 &: \mu_1 = \mu_2 \\
+H_1 &: \mu_1 \neq \mu_2
+\end{aligned}
+$$
+
+**2. Test Statistic (Z):** Since the population variances
+($\sigma_1^2, \sigma_2^2$) are known, we use the Z-statistic: $$
+Z = \frac{\bar{X} - \bar{Y}}{\sqrt{\frac{\sigma_1^2}{n_1} + \frac{\sigma_2^2}{n_2}}}
+$$ Where: \* $\bar{X}, \bar{Y}$ are the sample means. \*
+$\sigma_1^2 = \sigma_2^2 = 1$ are the known population variances. \*
+$n_1, n_2$ are the sample sizes.
+
+**3. Decision Rule:** For a significance level $\alpha = 0.05$, we
+reject $H_0$ if the absolute value of the calculated Z-statistic exceeds
+the critical value from the standard normal distribution:
+$$|Z_{stat}| > Z_{1-\alpha/2} \approx 1.96$$
+
+## Code
+
+```{r}
+sigma1 <- 1; sigma2 <- 1
+n1 <- length(X); n2 <- length(Y)
+mean_x <- mean(X); mean_y <- mean(Y)
+se <- sqrt((sigma1^2 / n1) + (sigma2^2 / n2))
+z_stat <- (mean_x - mean_y) / se
+p_value_z <- 2 * (1 - pnorm(abs(z_stat)))
+
+z_vals <- seq(-4, 4, length=1000)
+z_dens <- dnorm(z_vals)
+df_z <- data.frame(z=z_vals, density=z_dens)
+
+p2 <- ggplot(df_z, aes(x=z, y=density)) +
+  geom_line(size=1) +
+  geom_area(data=subset(df_z, z < -1.96), aes(y=density), fill="red", alpha=0.4) +
+  geom_area(data=subset(df_z, z > 1.96), aes(y=density), fill="red", alpha=0.4) +
+  geom_vline(xintercept = z_stat, color="blue", linetype="dashed", size=1.2) +
+  annotate("text", x=2.5, y=0.3, label="Rejection Region\n(alpha=0.05)", color="red", size=3.5) +
+  annotate("text", x=z_stat, y=0.1, label=paste("Z-stat =", round(z_stat, 2)), 
+           color="blue", angle=90, vjust=-0.5) +
+  labs(title = "Z-test Hypothesis Visualization",
+       subtitle = "Blue line: Calculated Z-statistic | Red area: Rejection Region",
+       x = "Z-score", y = "Density") +
+  theme_minimal()
+
+print(p2)
+
+cat("Z-statistic:", z_stat, "\n")
+cat("P-value:", p_value_z, "\n")
+```
+
+## **Conclusion:**
+
+Based on the obtained results: \* The Z-statistic is **1.548**. \* The
+P-value is **0.122**.
+
+Since the P-value ($0.122$) is **greater than** the significance level
+($\alpha = 0.05$), we **fail to reject the null hypothesis** ($H_0$).
+
+*Interpretation:* We do not have sufficient statistical evidence to
+claim that the true population means $\mu_1$ and $\mu_2$ are different.
+The observed difference between the sample means ($-0.053$ vs $-0.322$)
+is likely due to random sampling variation rather than a real difference
+in the populations.
+
+# Problem 2
+
+## Theoretical Background: F-Test for Equality of Variances
+
+Here, we investigate whether the variance of the first population is
+strictly greater than the variance of the second population.
+
+**1. Hypotheses:** The null hypothesis states that the variances are
+equal. The alternative hypothesis is one-sided (right-tailed). $$
+\begin{aligned}
+H_0 &: \sigma_1^2 = \sigma_2^2 \\
+H_1 &: \sigma_1^2 > \sigma_2^2
+\end{aligned}
+$$
+
+**2. Test Statistic (F):** The F-statistic is the ratio of the sample
+variances ($S_X^2$ and $S_Y^2$): $$
+F = \frac{S_X^2}{S_Y^2}
+$$ Under the null hypothesis, this statistic follows an F-distribution
+with degrees of freedom $df_1 = n_1 - 1$ and $df_2 = n_2 - 1$.
+
+**3. Decision Rule:** For a significance level $\alpha = 0.05$, we
+reject $H_0$ if the calculated F-statistic is greater than the critical
+value: $$F_{stat} > F_{\alpha, n_1-1, n_2-1}$$ Where
+$F_{\alpha, n_1-1, n_2-1}$ is the quantile of the F-distribution such
+that the area to the right is $\alpha$.
+
+## Code
+
+```{r}
+var_x <- var(X); var_y <- var(Y)
+f_stat <- var_x / var_y
+df1 <- n1 - 1; df2 <- n2 - 1
+f_crit <- qf(0.95, df1, df2)
+p_value_f <- 1 - pf(f_stat, df1, df2)
+
+f_vals <- seq(0, max(3, f_stat + 1), length=1000)
+f_dens <- df(f_vals, df1, df2)
+df_f <- data.frame(f=f_vals, density=f_dens)
+
+p3 <- ggplot(df_f, aes(x=f, y=density)) +
+  geom_line(size=1) +
+  geom_area(data=subset(df_f, f > f_crit), aes(y=density), fill="red", alpha=0.4) +
+  geom_vline(xintercept = f_stat, color="blue", linetype="dashed", size=1.2) +
+  annotate("text", x=f_crit + 0.5, y=0.4, label="Rejection Region\n(H1: Var1 > Var2)", color="red", size=3.5) +
+  annotate("text", x=f_stat, y=0.2, label=paste("F-stat =", round(f_stat, 2)), 
+           color="blue", angle=90, vjust=-0.5) +
+  labs(title = "F-test Hypothesis Visualization",
+       subtitle = paste("F-dist (df1=", df1, ", df2=", df2, ")"),
+       x = "F-score", y = "Density") +
+  theme_minimal()
+
+print(p3)
+
+cat("F-statistic:", f_stat, "\n")
+cat("Critical Value:", f_crit, "\n")
+cat("P-value:", p_value_f, "\n")
+```
+
+## Conclusion
+
+**Conclusion:** Based on the obtained results: \* The F-statistic is
+**0.750**. \* The P-value is **0.886**.
+
+Since the P-value ($0.886$) is **greater than** the significance level
+($\alpha = 0.05$) and the calculated F-statistic ($0.750$) is **less
+than** the critical value ($1.531$), we **fail to reject the null
+hypothesis** ($H_0$).
+
+*Interpretation:* There is no statistical evidence to support the claim
+that the variance of the first population is greater than the variance
+of the second population ($H_1: \sigma_1^2 > \sigma_2^2$). In fact, the
+sample variance of $X$ ($1.115$) turned out to be lower than that of $Y$
+($1.487$), which contradicts the direction of the alternative
+hypothesis.
+
+
+# Problem 3
+
+## Theoretical Background: Kolmogorov-Smirnov Test
+
+The Kolmogorov-Smirnov (KS) test is a non-parametric test used to compare distributions. It measures the maximum distance between two cumulative distribution functions (CDFs).
+
+**Main Idea:**
+The KS test compares:
+
+1. **Empirical Cumulative Distribution Function (ECDF)** - a step function built directly from the sample data
+2. **Theoretical Cumulative Distribution Function (CDF)** - the hypothesized distribution
+
+**Test Statistic:**
+$$
+D = \sup_x |F_n(x) - F(x)|
+$$
+where $F_n(x)$ is the ECDF from the sample and $F(x)$ is the theoretical CDF.
+
+**Types of KS Tests:**
+
+- **One-sample KS test:** Compares a sample with a specified distribution
+- **Two-sample KS test:** Compares two samples to see if they come from the same distribution
+
+**Decision Rule:**
+For significance level $\alpha = 0.05$:
+
+- **Rejection region:** $D > D_{critical}$ (depends on sample size)
+- **Decision:** Reject $H_0$ if p-value $< 0.05$
+
+The KS test is particularly useful because:
+
+- It makes no assumptions about the distribution of data (non-parametric)
+- It's sensitive to differences in both location and shape of distributions
+- It works well for continuous distributions
+
+## Problem 3(a): Testing Normality of $\{x_k\}_{k=1}^{100}$
+
+**Hypotheses:**
+$$
+\begin{aligned}
+H_0 &: \{x_k\}_{k=1}^{100} \text{ follows } N(\mu, \sigma^2) \text{ with parameters estimated from sample} \\
+H_1 &: \{x_k\}_{k=1}^{100} \text{ does not follow Normal distribution}
+\end{aligned}
+$$
+
+**Test Used:** One-sample Kolmogorov-Smirnov test
+
+**Why:** The KS test compares the empirical distribution of our data with the theoretical normal distribution. We estimate the parameters ($\mu$ and $\sigma$) from the sample itself.
+
+**Rejection Region:** For $\alpha = 0.05$, we reject $H_0$ if $D > D_{critical}$ or equivalently if p-value $< 0.05$.
+
+### Code
+```{r}
+# Estimate parameters from the sample
+mean_x <- mean(X)
+sd_x <- sd(X)
+
+# Perform KS test for normality
+ks_test_a <- ks.test(X, "pnorm", mean = mean_x, sd = sd_x)
+
+# Visualization
+par(mfrow = c(1, 2))
+
+# ECDF vs Theoretical CDF
+plot(ecdf(X), main = "ECDF vs Normal CDF", 
+     xlab = "x", ylab = "Cumulative Probability",
+     col = "blue", lwd = 2, cex.main = 0.9)
+curve(pnorm(x, mean = mean_x, sd = sd_x), 
+      add = TRUE, col = "red", lwd = 2, lty = 2)
+legend("topleft", c("Empirical (ECDF)", "Theoretical Normal"), 
+       col = c("blue", "red"), lty = c(1, 2), lwd = 2, cex = 0.8)
+
+# Histogram with theoretical density
+hist(X, breaks = 30, probability = TRUE, 
+     main = "Histogram vs Normal Density",
+     xlab = "x", col = "lightblue", border = "white", cex.main = 0.9)
+curve(dnorm(x, mean = mean_x, sd = sd_x), 
+      add = TRUE, col = "red", lwd = 2)
+legend("topright", "Normal density", col = "red", lwd = 2, cex = 0.8)
+
+par(mfrow = c(1, 1))
+```
+
+### Statistics and Conclusion
+
+**Sample Parameters:**
+
+- Mean ($\hat{\mu}$) = `r round(mean_x, 6)`
+- Standard deviation ($\hat{\sigma}$) = `r round(sd_x, 6)`
+
+**Test Statistics:**
+
+- D statistic = `r round(ks_test_a$statistic, 6)`
+- P-value = `r round(ks_test_a$p.value, 6)`
+
+**Conclusion:**
+
+`r if(ks_test_a$p.value > 0.05) { paste0("Since the p-value (", round(ks_test_a$p.value, 6), ") is **greater than** the significance level (α = 0.05), we **fail to reject the null hypothesis** (H₀). The data is consistent with a normal distribution. This result is expected since the data was generated using qnorm (inverse normal CDF), which should produce normally distributed values.") } else { paste0("Since the p-value (", round(ks_test_a$p.value, 6), ") is **less than** the significance level (α = 0.05), we **reject the null hypothesis** (H₀). The data does not follow a normal distribution. This is surprising given that the data was generated via qnorm, suggesting that the fractional part sequence a_k may not be truly uniform.") }`
+
+---
+
+## Problem 3(b): Testing Exponential Distribution of $\{|x_k|\}_{k=1}^{100}$
+
+**Hypotheses:**
+$$
+\begin{aligned}
+H_0 &: \{|x_k|\}_{k=1}^{100} \text{ follows Exponential}(\lambda = 1) \\
+H_1 &: \{|x_k|\}_{k=1}^{100} \text{ does not follow Exponential}(\lambda = 1)
+\end{aligned}
+$$
+
+**Test Used:** One-sample Kolmogorov-Smirnov test
+
+**Why:** We want to test if the absolute values of our data follow an exponential distribution with rate parameter $\lambda = 1$. The exponential distribution has mean $1/\lambda = 1$.
+
+**Rejection Region:** For $\alpha = 0.05$, we reject $H_0$ if $D > D_{critical}$ or equivalently if p-value $< 0.05$.
+
+### Code
+```{r}
+# Take absolute values
+abs_X <- abs(X)
+
+# Perform KS test for exponential distribution
+ks_test_b <- ks.test(abs_X, "pexp", rate = 1)
+
+# Visualization
+par(mfrow = c(1, 2))
+
+# ECDF vs Theoretical CDF
+plot(ecdf(abs_X), main = "ECDF vs Exponential CDF", 
+     xlab = "|x|", ylab = "Cumulative Probability",
+     col = "blue", lwd = 2, cex.main = 0.9)
+curve(pexp(x, rate = 1), 
+      add = TRUE, col = "red", lwd = 2, lty = 2)
+legend("bottomright", c("Empirical (ECDF)", "Theoretical Exp(1)"), 
+       col = c("blue", "red"), lty = c(1, 2), lwd = 2, cex = 0.8)
+
+# Histogram with theoretical density
+hist(abs_X, breaks = 30, probability = TRUE, 
+     main = "Histogram vs Exponential Density",
+     xlab = "|x|", col = "lightgreen", border = "white", cex.main = 0.9)
+curve(dexp(x, rate = 1), 
+      add = TRUE, col = "red", lwd = 2)
+legend("topright", "Exp(1) density", col = "red", lwd = 2, cex = 0.8)
+
+par(mfrow = c(1, 1))
+```
+
+### Statistics and Conclusion
+
+**Sample Statistics of $\{|x_k|\}$:**
+
+- Sample mean = `r round(mean(abs_X), 6)`
+- Sample standard deviation = `r round(sd(abs_X), 6)`
+
+**Theoretical Exponential(1) parameters:**
+
+- Mean = $1/\lambda = 1$
+- Standard deviation = $1/\lambda = 1$
+
+**Test Statistics:**
+
+- D statistic = `r round(ks_test_b$statistic, 6)`
+- P-value = `r round(ks_test_b$p.value, 6)`
+
+**Conclusion:**
+
+`r if(ks_test_b$p.value > 0.05) { paste0("Since the p-value (", round(ks_test_b$p.value, 6), ") is **greater than** the significance level (α = 0.05), we **fail to reject the null hypothesis** (H₀). The absolute values are consistent with Exponential(λ=1) distribution. This is an interesting theoretical result, though it's worth noting that if X ~ N(0,1), then |X| should follow a half-normal distribution, not exponential.") } else { paste0("Since the p-value (", round(ks_test_b$p.value, 6), ") is **less than** the significance level (α = 0.05), we **reject the null hypothesis** (H₀). The absolute values do not follow Exponential(λ=1) distribution. This is expected because if X ~ N(μ,σ²), then |X| follows a folded normal or half-normal distribution, not an exponential distribution.") }`
+
+---
+
+## Problem 3(c): Testing Equality of Distributions of $\{x_k\}$ and $\{y_l\}$
+
+**Hypotheses:**
+$$
+\begin{aligned}
+H_0 &: \{x_k\}_{k=1}^{100} \text{ and } \{y_l\}_{l=1}^{50} \text{ have the same distribution} \\
+H_1 &: \{x_k\}_{k=1}^{100} \text{ and } \{y_l\}_{l=1}^{50} \text{ have different distributions}
+\end{aligned}
+$$
+
+**Test Used:** Two-sample Kolmogorov-Smirnov test
+
+**Why:** The two-sample KS test compares the empirical distributions of two independent samples to determine if they come from the same underlying distribution. This is a non-parametric test that is sensitive to differences in location, scale, and shape.
+
+**Rejection Region:** For $\alpha = 0.05$, we reject $H_0$ if $D > D_{critical}$ or equivalently if p-value $< 0.05$.
+
+### Code
+```{r}
+# Perform two-sample KS test
+ks_test_c <- ks.test(X, Y)
+
+# Visualization
+par(mfrow = c(1, 2))
+
+# Comparison of ECDFs
+plot(ecdf(X), main = "Comparison of ECDFs", 
+     xlab = "Value", ylab = "Cumulative Probability",
+     col = "blue", lwd = 2, cex.main = 0.9)
+plot(ecdf(Y), add = TRUE, col = "red", lwd = 2, lty = 2)
+legend("topleft", c("X sample (n=100)", "Y sample (n=50)"), 
+       col = c("blue", "red"), lty = c(1, 2), lwd = 2, cex = 0.8)
+
+# Overlaid histograms
+hist(X, breaks = 30, probability = TRUE, 
+     main = "Overlaid Histograms",
+     xlab = "Value", col = rgb(0, 0, 1, 0.3), border = "blue",
+     xlim = range(c(X, Y)), cex.main = 0.9)
+hist(Y, breaks = 20, probability = TRUE, 
+     col = rgb(1, 0, 0, 0.3), border = "red", add = TRUE)
+legend("topright", c("X sample", "Y sample"), 
+       fill = c(rgb(0, 0, 1, 0.3), rgb(1, 0, 0, 0.3)), cex = 0.8)
+
+par(mfrow = c(1, 1))
+```
+
+### Statistics and Conclusion
+
+**Sample Sizes:**
+
+- $n_1$ (X sample) = `r length(X)`
+- $n_2$ (Y sample) = `r length(Y)`
+
+**Sample Statistics:**
+
+- X: mean = `r round(mean(X), 6)`, sd = `r round(sd(X), 6)`
+- Y: mean = `r round(mean(Y), 6)`, sd = `r round(sd(Y), 6)`
+
+**Test Statistics:**
+
+- D statistic = `r round(ks_test_c$statistic, 6)`
+- P-value = `r round(ks_test_c$p.value, 6)`
+
+**Conclusion:**
+
+`r if(ks_test_c$p.value > 0.05) { paste0("Since the p-value (", round(ks_test_c$p.value, 6), ") is **greater than** the significance level (α = 0.05), we **fail to reject the null hypothesis** (H₀). The two samples are consistent with having the same distribution. This makes sense because both X and Y were generated using the same process (qnorm transformation of fractional parts), just with different indices in the sequence a_k.") } else { paste0("Since the p-value (", round(ks_test_c$p.value, 6), ") is **less than** the significance level (α = 0.05), we **reject the null hypothesis** (H₀). The two samples have significantly different distributions. This suggests that the sequence a_k has different properties at indices 1-100 versus 101-150, possibly due to the specific mathematical form of k·ln(k²n + π).") }`
+
+---
+
+## Summary and Comments on KS Test Results
+
+### Key Observations:
+
+**1. Data Generation Method:**
+The data was generated using a fractional part transformation of $k \cdot \ln(k^2 n + \pi)$, followed by the inverse normal transformation (qnorm). This creates a deterministic but complex sequence that should approximate random normal samples.
+
+**2. Test 3(a) - Normality:**
+The test examines whether the generation process successfully produced normally distributed data. Since we used qnorm (the inverse CDF of the standard normal), we expect the data to pass this test if the input sequence $a_k$ is sufficiently uniform.
+
+**3. Test 3(b) - Exponential Distribution:**
+This test is theoretically interesting. For a standard normal variable $X \sim N(0,1)$, the absolute value $|X|$ follows a half-normal distribution (also called folded normal), not an exponential distribution. The half-normal has PDF:
+$$f(x) = \sqrt{\frac{2}{\pi}} e^{-x^2/2}, \quad x \geq 0$$
+This is distinctly different from the exponential PDF: $f(x) = \lambda e^{-\lambda x}$.
+
+**4. Test 3(c) - Comparison of Two Samples:**
+Both X and Y were generated using the same mathematical process but from different segments of the sequence. If the sequence $a_k$ maintains its properties across different ranges of k, we would expect the samples to have similar distributions.
+
+**5. Statistical Power:**
+With sample sizes of 100 (X) and 50 (Y), the KS test has good power to detect meaningful differences in distributions. The test is particularly sensitive to:
+
+- Differences in location (shifts in mean/median)
+- Differences in scale (variance)
+- Differences in shape (skewness, kurtosis)
+
+**6. Practical Implications:**
+The KS test is widely used because it:
+
+- Requires no parametric assumptions (distribution-free)
+- Works well for continuous distributions
+- Provides a visual interpretation through CDF comparison
+- Can detect various types of distributional differences
+
+However, it has some limitations:
+
+- Less powerful than parametric tests when those assumptions hold
+- Sensitive to ties in data (though not an issue with continuous distributions)
+- The critical values depend on sample size
+
+---
