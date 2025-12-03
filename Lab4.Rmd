@@ -222,7 +222,7 @@ hypothesis.
 
 ## Theoretical Background: Kolmogorov-Smirnov Test
 
-The Kolmogorov-Smirnov (KS) test is a non-parametric test used to compare distributions. It measures the maximum distance between two cumulative distribution functions (CDFs).
+The Kolmogorov-Smirnov (KS) test is a test used to compare distributions. It measures the maximum distance between two cumulative distribution functions (CDFs).
 
 **Main Idea:**
 The KS test compares:
@@ -238,8 +238,8 @@ where $F_n(x)$ is the ECDF from the sample and $F(x)$ is the theoretical CDF.
 
 **Types of KS Tests:**
 
-- **One-sample KS test:** Compares a sample with a specified distribution
-- **Two-sample KS test:** Compares two samples to see if they come from the same distribution
+- **One-sample KS test(also called Kolmogorov):** Compares a sample with a specified distribution
+- **Two-sample KS test(also called Kolmogorov-Smirnov):** Compares two samples to see if they come from the same distribution
 
 **Decision Rule:**
 For significance level $\alpha = 0.05$:
@@ -247,13 +247,8 @@ For significance level $\alpha = 0.05$:
 - **Rejection region:** $D > D_{critical}$ (depends on sample size)
 - **Decision:** Reject $H_0$ if p-value $< 0.05$
 
-The KS test is particularly useful because:
 
-- It makes no assumptions about the distribution of data (non-parametric)
-- It's sensitive to differences in both location and shape of distributions
-- It works well for continuous distributions
-
-## Problem 3(a): Testing Normality of $\{x_k\}_{k=1}^{100}$
+## (a): Testing Normality of $\{x_k\}_{k=1}^{100}$
 
 **Hypotheses:**
 $$
@@ -319,7 +314,7 @@ par(mfrow = c(1, 1))
 
 ---
 
-## Problem 3(b): Testing Exponential Distribution of $\{|x_k|\}_{k=1}^{100}$
+## (b): Testing Exponential Distribution of $\{|x_k|\}_{k=1}^{100}$
 
 **Hypotheses:**
 $$
@@ -385,11 +380,11 @@ par(mfrow = c(1, 1))
 
 **Conclusion:**
 
-`r if(ks_test_b$p.value > 0.05) { paste0("Since the p-value (", round(ks_test_b$p.value, 6), ") is **greater than** the significance level (α = 0.05), we **fail to reject the null hypothesis** (H₀). The absolute values are consistent with Exponential(λ=1) distribution. This is an interesting theoretical result, though it's worth noting that if X ~ N(0,1), then |X| should follow a half-normal distribution, not exponential.") } else { paste0("Since the p-value (", round(ks_test_b$p.value, 6), ") is **less than** the significance level (α = 0.05), we **reject the null hypothesis** (H₀). The absolute values do not follow Exponential(λ=1) distribution. This is expected because if X ~ N(μ,σ²), then |X| follows a folded normal or half-normal distribution, not an exponential distribution.") }`
+Since the p-value (0.080208) is greater than the significance level (α = 0.05), we fail to reject the null hypothesis (H₀). The absolute values are consistent with Exponential(λ=1) distribution
 
 ---
 
-## Problem 3(c): Testing Equality of Distributions of $\{x_k\}$ and $\{y_l\}$
+## (c): Testing Equality of Distributions of $\{x_k\}$ and $\{y_l\}$
 
 **Hypotheses:**
 $$
@@ -461,39 +456,297 @@ par(mfrow = c(1, 1))
 
 ### Key Observations:
 
-**1. Data Generation Method:**
-The data was generated using a fractional part transformation of $k \cdot \ln(k^2 n + \pi)$, followed by the inverse normal transformation (qnorm). This creates a deterministic but complex sequence that should approximate random normal samples.
 
-**2. Test 3(a) - Normality:**
+
+**1. Test 3(a) - Normality:**
 The test examines whether the generation process successfully produced normally distributed data. Since we used qnorm (the inverse CDF of the standard normal), we expect the data to pass this test if the input sequence $a_k$ is sufficiently uniform.
 
-**3. Test 3(b) - Exponential Distribution:**
-This test is theoretically interesting. For a standard normal variable $X \sim N(0,1)$, the absolute value $|X|$ follows a half-normal distribution (also called folded normal), not an exponential distribution. The half-normal has PDF:
-$$f(x) = \sqrt{\frac{2}{\pi}} e^{-x^2/2}, \quad x \geq 0$$
-This is distinctly different from the exponential PDF: $f(x) = \lambda e^{-\lambda x}$.
+**2. Test 3(b) - Exponential Distribution:**
+This test is theoretically interesting. For a standard normal variable $X \sim N(0,1)$, the absolute value $|X|$ follows a half-normal distribution (also called folded normal), not an exponential distribution.
 
-**4. Test 3(c) - Comparison of Two Samples:**
-Both X and Y were generated using the same mathematical process but from different segments of the sequence. If the sequence $a_k$ maintains its properties across different ranges of k, we would expect the samples to have similar distributions.
+**3. Test 3(c) - Comparison of Two Samples:**
+Both X and Y were generated using the same mathematical process but from different segments of the sequence. We expect the samples to have similar distributions.
 
-**5. Statistical Power:**
-With sample sizes of 100 (X) and 50 (Y), the KS test has good power to detect meaningful differences in distributions. The test is particularly sensitive to:
+# Problem 4. Regression of Marks on Study Time
 
-- Differences in location (shifts in mean/median)
-- Differences in scale (variance)
-- Differences in shape (skewness, kurtosis)
+In this task we fit a linear regression of marks (dependent variable) on
+study time (independent variable).
 
-**6. Practical Implications:**
-The KS test is widely used because it:
+## (a) Scatter plot of Marks vs Study Time
 
-- Requires no parametric assumptions (distribution-free)
-- Works well for continuous distributions
-- Provides a visual interpretation through CDF comparison
-- Can detect various types of distributional differences
+Firstly, let's read and display our data:
 
-However, it has some limitations:
+```{r}
+df <- read.csv("data.csv")
 
-- Less powerful than parametric tests when those assumptions hold
-- Sensitive to ties in data (though not an issue with continuous distributions)
-- The critical values depend on sample size
+p_scatter <- ggplot(df, aes(x = time_study, y = Marks)) +
+  geom_point(size = 2) +
+  theme_minimal() +
+  labs(title = "Marks vs Study time",
+       x = "Study time",
+       y = "Marks")
 
----
+print(p_scatter)
+```
+
+**Comments:**
+
+On this plot we can observe that there is correlation between study time
+and marks. For this reason, it makes sense to try fitting it in linear
+regression model.
+
+## (b) Fit linear regression model and derivation of the regression equation
+
+**Model:**
+
+We fit the simple linear regression model
+
+$$\text{marks}_i = \beta_0 + \beta_1 \cdot \text{time_study}_i + \varepsilon_i,$$
+
+where $\varepsilon_i$ are i.i.d. errors with mean 0 and variance
+$\sigma^2$.
+
+**Estimators:**
+
+We can use two different ways to estimate intercept and slope of linear
+regression, both will give us same results:
+
+### Maximum likelihood estimation
+
+The **likelihood function** is
+
+$$
+L(\beta_0,\beta_1,\sigma^2) = \frac{1}{\sqrt{2\pi\sigma^2}^n} \exp\Bigg(
+-\frac{1}{2\sigma^2} \sum_{i=1}^n (y_i - \beta_0 - \beta_1 x_i)^2
+\Bigg).
+$$
+
+To maximize this, we take the log-likelihood:
+
+$$
+\ell = -\frac{n}{2} \log(2\pi\sigma^2)
+- \frac{1}{2\sigma^2} \sum (y_i - \beta_0 - \beta_1 x_i)^2.
+$$
+
+Maximizing expression with respect to $\beta_0,\beta_1$ is equivalent to
+minimizing
+
+$$
+S = \sum (y_i - \beta_0 - \beta_1 x_i)^2
+$$
+
+Giving the MLEs:
+
+$$
+\hat\beta_1 = \frac{\sum (x_i-\bar{x})(y_i-\bar{y})}{\sum (x_i-\bar{x})^2} = \frac{n \sum{x_i y_i} - \sum{x_i} \sum{y_i}}{n \sum x_i^2 - (\sum x_i)^2}, \qquad \hat\beta_0 = \bar{y} - \hat\beta_1\bar{x}.
+$$
+
+### Ordinary least squares (OLS) estimation
+
+The OLS estimator minimizes the sum of squared residuals
+
+$$
+S(\beta_0,\beta_1)=\sum_{i=1}^n
+(y_i-\beta_0-\beta_1 x_i)^2.
+$$
+
+To minimize, we set partial derivatives to zero:
+
+$$
+\frac{\partial S}{\partial \beta_0} = -2\sum_{i=1}^n (y_i-\beta_0-\beta_1 x_i)=0,
+\frac{\partial S}{\partial \beta_1} = -2\sum_{i=1}^n x_i(y_i-\beta_0-\beta_1 x_i)=0.
+$$
+
+Solving gives us same results as maximum likelihood estimation
+
+$$
+\hat\beta_1=\frac{\sum (x_i-\bar{x})(y_i-\bar{y})}{\sum
+(x_i-\bar{x})^2},\qquad \hat\beta_0=\bar{y}-\hat\beta_1\bar{x}
+$$
+
+Then we compute the regression model coefficients manually:
+
+```{r}
+x <- df$time_study
+y <- df$Marks
+
+slope_manual <- sum((x - mean(x)) * (y - mean(y))) / sum((x - mean(x))^2)
+intercept_manual <- mean(y) - slope_manual * mean(x)
+
+cat("Beta1 (slope):", slope_manual, "\n")
+cat("Beta0 (intercept):", intercept_manual, "\n")
+```
+
+**Visualization:**
+
+```{r}
+p_scatter <- ggplot(df, aes(x = time_study, y = Marks)) +
+  geom_point(size = 2) +
+  geom_abline(intercept = intercept_manual, slope = slope_manual, color = "blue") +
+  theme_minimal() +
+  labs(title = "Marks vs Study time",
+       x = "Study time",
+       y = "Marks")
+
+print(p_scatter)
+```
+
+**Comments:**
+
+We estimated linear regression parameters for given data. Now, it is
+important to know how good our model fits actual data, because not all
+datasets are suitable for linear regression
+
+## (c) Evaluate goodness-of-fit for the fitted line
+
+We evaluate fit with coefficient of determination $R^2$. It is defined
+as:
+
+$$
+SS_{tot} = \sum_{i=1}^n (y_i-\bar{y})^2,\\
+SS_{res} = \sum_{i=1}^n (y_i-\hat{y}_i)^2,\\
+R^2 = 1 - \frac{SS_{res}}{SS_{tot}}.
+$$
+
+$SS_{tot}$ part shows us how far is our sample y from mean y in average,
+while $SS_{res}$ tells us how far is it in average from our predicted y
+(we predict different y for each data entry from our sample). If we take
+raw $SS_{res}$, it will not give us representative results, because
+variance of y itself could be different. So if we divide $SS_{res}$ by
+$SS_{tot}$, we want this value be as small as possible (that means that
+our model gives smaller distance difference than when we simply take
+sample mean as prediction for each data entry), so we subtract this
+fraction from 1 to get our $R^2$ score:
+
+```{r}
+predicted_y = x * slope_manual + intercept_manual
+
+SS_res <- sum((y - predicted_y)^2)
+
+SS_tot <- sum((y - mean(y))^2)
+
+R_squared_manual <- 1 - SS_res / SS_tot
+
+cat("R^2:", R_squared_manual, "\n")
+```
+
+**Comments:**
+
+As we can see, linear regression fits data pretty well: $R^2$ is almost
+90%. It means that linear regression model can estimate and predict
+marks based on study time well (if to consider our sample good enough)
+
+## (d) Test whether study time is significant in predicting marks
+
+**Idea:**
+
+We test
+
+$$H_0: \beta_1 = 0 \quad\text{vs}\quad H_1: \beta_1 \neq 0.$$
+
+We will use t-test, because we do not know real variance of slope, but
+we can estimate it using our sample variance. Let's calculate
+t-statistic for the slope: it is how far our estimated slope is from the
+null hypothesis value, measured in units of its standard error. We
+calculate it dividing sample slope by its sample standard error (sample
+standard error is calculated like standard deviation, but for sample -
+so we are taking square root of sample variance). To calculate sample
+variance of slope, we divide residual variance $\hat\sigma^2$ by spread
+of x in sample:
+
+$$t = \frac{\hat{\beta}_1 - 0}{\widehat{SE}(\hat{\beta}_1)} = \frac{\hat{\beta}_1}{\sqrt{Var(\hat{\beta}_1)}} = \frac{\hat{\beta}_1}{\sqrt{\frac{\hat\sigma^2}{\sum (x_i - \bar x)^2 }}} = \frac{\hat{\beta}_1}{\sqrt{\frac{\sum (y_i - \bar y)^2}{(n - 2) \sum (x_i - \bar x)^2 }}}$$
+
+We subtract 0 in numerator - value of slope under $H_0$, and dividing by
+$n - 2$ while finding residual variance, because there are two
+parameters (intercept and slope), which take one degree of freedom each.
+
+In this way, we find t-statistic, which follows a Student's
+t-distribution with $n-2$ degrees of freedom. Then, p-value is just a
+probability of observing a t-statistic at least as extreme as the one we
+computed, assuming that null hypothesis is true. To calculate this
+probability, we are finding probability of getting t-statistic out of
+interval [-t, t], and compute this probability using CDF of Student's
+distribution:
+
+```{r}
+sample_error_variance <- sum((y - predicted_y)^2) / (length(y) - 2)
+
+sample_slope_variance <- sample_error_variance / sum((x - mean(x))^2)
+
+t_stat <- slope_manual / sqrt(sample_slope_variance)
+
+cat("T-statistic: ", t_stat, "\n")
+
+p_value <- 2 * (1 - pt(abs(t_stat), df=length(y)-2))
+
+cat("P-value: ", p_value, "\n")
+```
+
+**Comments:**
+
+Because we got very big t-statistic and very small p-value, we can
+safely reject null hypothesis: it is very unlikely to get data with
+slope at least as far from 0 as we got if null hypothesis is true, so
+null hypothesis probably should be rejected (with huge probability).
+
+## (e) Prediction for student who studies 8 hours
+
+Firstly, we can compute the point prediction, just fitting student's
+data into our regression model with known slope and intercept:
+
+```{r}
+study_time = 8.0
+
+predicted_score = study_time * slope_manual + intercept_manual
+
+cat("Score predicted by regression model for time", study_time, ":", predicted_score)
+```
+
+**Comments:**
+
+Using our regression model, we can predict student's score based on time
+he/she studied. We can predict score which is most probable, and it
+probably would be close enough, because we already tested that our model
+has big goodness-of-fit.
+
+## (f) Suggestions to potentially improve prediction accuracy
+
+1.  **Add relevant predictors.** Study time alone explains only part of
+    the variability. Including additional features such as attendance,
+    homework completion, sleep, or difficulty of course would likely
+    improve accuracy.
+
+2.  **Use nonlinear models or transformations.** If the relationship is
+    not strictly linear, it could be helpful to try to add more
+    parameters to our regression (now it has only intercept and slope),
+    for example, parameter which will be multiplied by $time^2$.
+
+3.  **Collect more data.** Current dataset consists of only 100 entries,
+    which on practice is not enough for reliable prediction. Due to
+    randomness of sample with such size or bias (for example, if it is
+    data from only one university), our model could be not as accurate
+    as we would like it to be for future predictions.
+
+## Conclusion
+
+In this task, we explored how to fit, analyse, and interpret a simple
+linear regression model of marks on study time.
+
+We began by visualizing the data and observed a clear positive
+relationship between study time and marks. Using both OLS and MLE
+approaches, we derived the regression line coefficients and confirmed
+that the estimated slope and intercept are identical under both methods.
+
+Goodness-of-fit analysis showed a high $R^2$, indicating that linear
+regression model fits our data well. Hypothesis testing confirmed that
+the slope is statistically significant: the large t-statistic and
+extremely small p-value strongly reject the null hypothesis that study
+time has no effect on marks.
+
+We then used the model to predict the expected mark for a student who
+studies 8 hours, demonstrating that model can be used to predict score
+from time based on coefficients it calculated earlier.
+
+Overall, the linear regression model is simple, but still powerful tool
+for cases where there is linear correlation between parameters and we
+need to predict one parameter while having others.
